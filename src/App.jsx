@@ -3,7 +3,8 @@ import {
   Heart, X as IconX, MessageCircle, User, Briefcase, PlusCircle,
   Settings, MapPin, ArrowLeft, RotateCcw, Check, Star, Camera,
   Send, Compass, LogOut, Lock, ChevronDown, FileX, Plane, MousePointerClick, ShieldCheck, Globe,
-  Crown, Zap, Infinity as InfinityIcon, Mail, KeyRound, Search, Repeat, Siren, Pencil, Users
+  Crown, Zap, Infinity as InfinityIcon, Mail, KeyRound, Search, Repeat, Siren, Pencil, Users,
+  MoreVertical, Share2, Flag, Ban, Send as SendIcon, Sparkles
 } from "lucide-react";
 
 /* ============================== LOGO ============================== */
@@ -119,6 +120,58 @@ function capWords(str) {
   return str.split(" ").map(w => w.length ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(" ");
 }
 
+/* ============================== TOAST / ACTION FEEDBACK ==============================
+   Fire-and-forget from anywhere: toast("Message sent"). No prop drilling — uses a plain
+   browser event that <ToastHost/> (mounted once at the app root) listens for.
+============================================================================================= */
+function toast(message, tone = "default") {
+  window.dispatchEvent(new CustomEvent("kiver-toast", { detail: { id: uid(), message, tone } }));
+}
+
+function ToastHost() {
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    function onToast(e) {
+      const t = e.detail;
+      setToasts(ts => [...ts, t]);
+      setTimeout(() => setToasts(ts => ts.filter(x => x.id !== t.id)), 2600);
+    }
+    window.addEventListener("kiver-toast", onToast);
+    return () => window.removeEventListener("kiver-toast", onToast);
+  }, []);
+
+  if (toasts.length === 0) return null;
+  return (
+    <div style={{
+      position: "absolute", left: 0, right: 0, bottom: 88, display: "flex", flexDirection: "column",
+      alignItems: "center", gap: 8, zIndex: 60, pointerEvents: "none", padding: "0 16px"
+    }}>
+      {toasts.map(t => (
+        <div key={t.id} className="fadeup" style={{
+          background: t.tone === "error" ? "#E14B5A" : "#14213D", color: "#fff",
+          padding: "10px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600,
+          boxShadow: "0 10px 24px #00000035", display: "flex", alignItems: "center", gap: 8, maxWidth: "92%"
+        }}>
+          {t.tone !== "error" && <Check size={14} strokeWidth={3} color={C.good} />}
+          {t.message}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============================== PROFILE PROMPTS & TAGS ============================== */
+const PROMPT_LIBRARY = [
+  "The project I'm most proud of...",
+  "My ideal work vibe...",
+  "What makes me reliable...",
+  "A skill I'm still growing...",
+  "Why I love this work...",
+];
+const WORK_STYLE_OPTIONS = ["Remote", "In-Person", "Daily Cash/Gig", "Async"];
+const AVAILABILITY_OPTIONS = ["Immediate", "Part-Time", "Gigs/Contract"];
+
 /* ============================== DISTANCE (HAVERSINE) ============================== */
 const WORLDWIDE_MILES = 105; // slider max = no radius cap ("Worldwide")
 
@@ -185,6 +238,8 @@ const PROFESSION_SUGGESTIONS = [
   "Computer Repair Technician", "Event Staff", "Cleaner (Commercial)", "Laundry Attendant", "Ironing Service",
   "Sewing/Tailoring", "Pet Groomer", "Pet Sitter", "Furniture Assembler", "Moving Helper", "Snow Shoveler",
   "Fence Installer", "Roofing Assistant", "Demolition Laborer",
+  "Band/Singer/Musician", "Shoe Shiner", "Shoe Repair", "Lawn Mower/Yard Care", "Ice/Snow Remover",
+  "Cleaner", "Tailor", "Video Editor", "Developer", "Support Rep",
 ];
 
 function ProfessionPicker({ selected, onChange, max = 3, placeholder = "Type a job or skill..." }) {
@@ -251,6 +306,48 @@ function ProfessionPicker({ selected, onChange, max = 3, placeholder = "Type a j
   );
 }
 
+function PromptsPicker({ prompts, onChange, max = 2 }) {
+  const slots = prompts.length ? prompts : [{ prompt: "", answer: "" }];
+
+  function updateSlot(i, field, value) {
+    const next = slots.map((s, idx) => idx === i ? { ...s, [field]: value } : s);
+    onChange(next);
+  }
+  function addSlot() {
+    if (slots.length >= max) return;
+    onChange([...slots, { prompt: "", answer: "" }]);
+  }
+  function removeSlot(i) {
+    onChange(slots.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      {slots.map((s, i) => (
+        <div key={i} style={{ marginBottom: 10, background: C.blueSoft, borderRadius: 12, padding: 12 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <select value={s.prompt} onChange={e => updateSlot(i, "prompt", e.target.value)} style={{ ...inputStyle, flex: 1, padding: "8px 10px", fontSize: 12.5 }}>
+              <option value="">Choose a prompt...</option>
+              {PROMPT_LIBRARY.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            {slots.length > 1 && (
+              <button type="button" onClick={() => removeSlot(i)} style={{ background: "#fff", border: "none", borderRadius: "50%", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkDim, flexShrink: 0 }}>
+                <IconX size={12} />
+              </button>
+            )}
+          </div>
+          <input value={s.answer} onChange={e => updateSlot(i, "answer", e.target.value)} placeholder="Your answer..." style={{ ...inputStyle, fontSize: 13 }} />
+        </div>
+      ))}
+      {slots.length < max && (
+        <button type="button" onClick={addSlot} style={{ background: "none", border: `1.5px dashed ${C.line}`, borderRadius: 10, padding: "9px 12px", fontSize: 12.5, fontWeight: 700, color: C.blue, width: "100%" }}>
+          + Add another prompt
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ============================== SMALL UI PARTS ============================== */
 function Logo({ size = 34, withWordmark = true }) {
   return (
@@ -275,6 +372,79 @@ function Badge({ children, tone = "steel" }) {
       background: t.bg, color: t.fg, fontSize: 11, fontWeight: 700, padding: "4px 9px",
       borderRadius: 20, letterSpacing: "0.02em", display: "inline-block"
     }}>{children}</span>
+  );
+}
+
+function CardSafetyMenu({ targetName, targetType, onBlock, onReport }) {
+  const [open, setOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const noun = targetType === "listing" ? "listing" : "profile";
+
+  async function share() {
+    setOpen(false);
+    const text = `Check out this ${noun} on Kiver: ${targetName}`;
+    const url = typeof window !== "undefined" ? window.location.origin : "https://kiverapp.vercel.app";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Kiver", text, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(`${text} — ${url}`);
+        toast("Link copied");
+      }
+    } catch (e) { /* user cancelled share sheet */ }
+  }
+
+  function submitReport() {
+    onReport && onReport(reportReason.trim() || "No reason given");
+    setReportOpen(false);
+    setReportReason("");
+    toast("Report submitted");
+  }
+
+  const menuItemStyle = {
+    display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left",
+    background: "none", border: "none", padding: "11px 14px", fontSize: 13.5, fontWeight: 600, color: C.ink
+  };
+
+  return (
+    <div style={{ position: "absolute", top: 12, right: 12, zIndex: 8 }} onPointerDown={e => e.stopPropagation()}>
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: 30, height: 30, borderRadius: "50%", background: "#00000055", border: "none",
+        display: "flex", alignItems: "center", justifyContent: "center", color: "#fff"
+      }}><MoreVertical size={16} /></button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 8 }} />
+          <div style={{
+            position: "absolute", top: 36, right: 0, background: "#fff", borderRadius: 14,
+            boxShadow: "0 14px 32px #13204340", overflow: "hidden", minWidth: 190, zIndex: 9
+          }}>
+            <button type="button" onClick={share} style={menuItemStyle}><Share2 size={14} color={C.inkDim} /> Share {noun}</button>
+            <div style={{ borderTop: `1px solid ${C.line}` }} />
+            <button type="button" onClick={() => { setOpen(false); setReportOpen(true); }} style={menuItemStyle}><Flag size={14} color={C.inkDim} /> Report {noun}</button>
+            <div style={{ borderTop: `1px solid ${C.line}` }} />
+            <button type="button" onClick={() => { setOpen(false); onBlock && onBlock(); }} style={{ ...menuItemStyle, color: "#D62A2A" }}><Ban size={14} color="#D62A2A" /> Block {targetType === "listing" ? "company" : "user"}</button>
+          </div>
+        </>
+      )}
+
+      {reportOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "#0F1922B8", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 70, padding: 24 }}
+          onClick={() => setReportOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 18, padding: 20, width: "100%", maxWidth: 320 }}>
+            <div className="disp" style={{ fontWeight: 700, fontSize: 17, color: C.ink, marginBottom: 10 }}>Report {targetName}</div>
+            <textarea value={reportReason} onChange={e => setReportReason(e.target.value)} placeholder="What's wrong with this?"
+              style={{ ...inputStyle, minHeight: 70, resize: "vertical", marginBottom: 12 }} />
+            <div style={{ display: "flex", gap: 8 }}>
+              <GhostBtn onClick={() => setReportOpen(false)}>Cancel</GhostBtn>
+              <PrimaryBtn onClick={submitReport}>Submit</PrimaryBtn>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -442,7 +612,7 @@ export default function KiverApp() {
 
   return (
     <div style={{
-      minHeight: 580, background: C.bg, color: C.ink, maxWidth: 440, margin: "0 auto",
+      height: "100dvh", maxHeight: 800, background: C.bg, color: C.ink, maxWidth: 440, margin: "0 auto",
       borderRadius: 20, overflow: "hidden", position: "relative", display: "flex", flexDirection: "column",
       fontSize: 15, boxShadow: "0 0 0 1px #E4EBFA, 0 20px 60px #0B6EFC1a"
     }}>
@@ -488,6 +658,8 @@ export default function KiverApp() {
       {view === "app" && me && (
         <AppShell me={me} tab={tab} setTab={setTab} refreshMe={refreshMe} logout={logout} />
       )}
+
+      <ToastHost />
     </div>
   );
 }
@@ -758,7 +930,8 @@ function VerifyEmailScreen({ me, onVerified, onLogout }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resent, setResent] = useState(false);
-  const [fallbackCode, setFallbackCode] = useState(null); // only shown if real email sending isn't configured
+  const [fallbackCode, setFallbackCode] = useState(null); // only shown if real email delivery failed
+  const [sendReason, setSendReason] = useState(""); // the actual reason it failed, from the server
   const [sendStatus, setSendStatus] = useState("sending"); // sending | sent | failed
 
   async function sendCode(rec) {
@@ -769,12 +942,14 @@ function VerifyEmailScreen({ me, onVerified, onLogout }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: me.email, code: rec.code }),
       });
-      if (r.ok) { setSendStatus("sent"); setFallbackCode(null); return; }
-      throw new Error("send failed");
+      if (r.ok) { setSendStatus("sent"); setFallbackCode(null); setSendReason(""); return; }
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.error || `Send failed (HTTP ${r.status})`);
     } catch (e) {
-      // Real email sending isn't configured yet (no RESEND_API_KEY on the server) — fall back
-      // to showing the code on screen so the app never dead-ends, but flag it clearly.
+      // Real email delivery failed — fall back to showing the code on screen so the app
+      // never dead-ends, but show the ACTUAL reason rather than guessing.
       setSendStatus("failed");
+      setSendReason(e.message || "Unknown error");
       setFallbackCode(rec.code);
     }
   }
@@ -824,8 +999,8 @@ function VerifyEmailScreen({ me, onVerified, onLogout }) {
         </p>
         {fallbackCode && (
           <div style={{ background: "#FFF4D6", color: C.goldDark, fontSize: 12.5, borderRadius: 10, padding: "9px 12px", marginTop: 10, marginBottom: 16, lineHeight: 1.4 }}>
-            Real email sending isn't configured on this server yet (missing <code>RESEND_API_KEY</code>),
-            so here's your code instead: <strong>{fallbackCode}</strong>. See README.md to turn on real delivery.
+            Email delivery failed: <strong>{sendReason}</strong>
+            <br />So here's your code instead: <strong>{fallbackCode}</strong>.
           </div>
         )}
         <Field label="Verification code">
@@ -970,8 +1145,9 @@ function PhotoArrayPicker({ photos, onChange, max = 3, label = "Photos", require
   );
 }
 
-function LocationCaptureButton({ lat, lng, onCapture, label = "Use my current location" }) {
+function LocationCaptureButton({ lat, lng, onCapture, label = "Use my current location", required }) {
   const [status, setStatus] = useState("idle"); // idle | loading | error
+  const needsAttention = required && lat == null && lng == null;
 
   async function capture() {
     setStatus("loading");
@@ -987,8 +1163,9 @@ function LocationCaptureButton({ lat, lng, onCapture, label = "Use my current lo
   return (
     <div style={{ marginBottom: 14 }}>
       <button type="button" onClick={capture} style={{
-        display: "flex", alignItems: "center", gap: 6, background: C.blueSoft, color: C.blue,
-        border: "none", borderRadius: 10, padding: "9px 12px", fontSize: 12.5, fontWeight: 700
+        display: "flex", alignItems: "center", gap: 6,
+        background: needsAttention ? "#FFF0F0" : C.blueSoft, color: needsAttention ? "#D62A2A" : C.blue,
+        border: needsAttention ? "1.5px solid #FFC9C9" : "none", borderRadius: 10, padding: "9px 12px", fontSize: 12.5, fontWeight: 700
       }}>
         <MapPin size={13} /> {status === "loading" ? "Getting location..." : label}
       </button>
@@ -1015,6 +1192,9 @@ function WorkerForm({ onSubmit, onBack, saving }) {
   const [country, setCountry] = useState("");
   const [bio, setBio] = useState("");
   const [abilities, setAbilities] = useState([]);
+  const [workStyle, setWorkStyle] = useState("");
+  const [availability, setAvailability] = useState("");
+  const [prompts, setPrompts] = useState([]);
   const [sponsorship, setSponsorship] = useState("Does not need sponsorship");
   const [lat, setLat] = useState(null);
   const [lng, setLng] = useState(null);
@@ -1026,9 +1206,11 @@ function WorkerForm({ onSubmit, onBack, saving }) {
     if (!email.trim() || !password) return setError("Email and password are required.");
     if (password.length < 4) return setError("Password should be at least 4 characters.");
     if (abilities.length === 0) return setError("Choose at least 1 job you can do.");
+    if (lat == null || lng == null) return setError("Location is required — tap 'Share my location' below. Kiver matches you with nearby jobs, so this can't be skipped.");
     setError("");
     onSubmit({
       name, email: email.trim(), password, location: `${city}, ${country}`, bio, abilities,
+      workStyle, availability, prompts: prompts.filter(p => p.prompt && p.answer?.trim()),
       sponsorship, photo: photos[0], photos, lat, lng,
     });
   }
@@ -1043,9 +1225,26 @@ function WorkerForm({ onSubmit, onBack, saving }) {
         <div style={{ flex: 1 }}><Field label="City *"><input style={inputStyle} value={city} onChange={e => setCity(capWords(e.target.value))} placeholder="Nairobi" /></Field></div>
         <div style={{ flex: 1 }}><Field label="Country *"><input style={inputStyle} value={country} onChange={e => setCountry(capWords(e.target.value))} placeholder="Kenya" /></Field></div>
       </div>
-      <LocationCaptureButton lat={lat} lng={lng} onCapture={(la, lo) => { setLat(la); setLng(lo); }} label="Use my current location (for distance to jobs)" />
+      <LocationCaptureButton lat={lat} lng={lng} onCapture={(la, lo) => { setLat(la); setLng(lo); toast("📍 Location saved"); }} label="Share my location *" required />
       <Field label="What work can you do? (up to 3) *">
         <ProfessionPicker selected={abilities} onChange={setAbilities} max={3} placeholder="e.g. Gardener, Forklift Operator, IT Technician..." />
+      </Field>
+      <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <Field label="Work style"><select style={inputStyle} value={workStyle} onChange={e => setWorkStyle(e.target.value)}>
+            <option value="">Not specified</option>
+            {WORK_STYLE_OPTIONS.map(o => <option key={o}>{o}</option>)}
+          </select></Field>
+        </div>
+        <div style={{ flex: 1 }}>
+          <Field label="Availability"><select style={inputStyle} value={availability} onChange={e => setAvailability(e.target.value)}>
+            <option value="">Not specified</option>
+            {AVAILABILITY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+          </select></Field>
+        </div>
+      </div>
+      <Field label="Profile prompts (optional)">
+        <PromptsPicker prompts={prompts} onChange={setPrompts} max={2} />
       </Field>
       <Field label="Short bio (optional)"><textarea style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} value={bio} onChange={e => setBio(e.target.value)} placeholder="A line or two about the work you do." /></Field>
       <Field label="Sponsorship">
@@ -1069,6 +1268,7 @@ function EmployerForm({ onSubmit, onBack, saving }) {
   const [password, setPassword] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState("");
+  const [businessBio, setBusinessBio] = useState("");
   const [lat, setLat] = useState(null);
   const [lng, setLng] = useState(null);
   const [error, setError] = useState("");
@@ -1077,8 +1277,9 @@ function EmployerForm({ onSubmit, onBack, saving }) {
     if (!name.trim() || !city.trim() || !country.trim()) return setError("Name and location are required.");
     if (!email.trim() || !password) return setError("Email and password are required.");
     if (password.length < 4) return setError("Password should be at least 4 characters.");
+    if (lat == null || lng == null) return setError("Location is required — tap 'Share my location' below. Kiver matches you with nearby workers, so this can't be skipped.");
     setError("");
-    onSubmit({ name, email: email.trim(), password, location: `${city}, ${country}`, photo, lat, lng });
+    onSubmit({ name, email: email.trim(), password, location: `${city}, ${country}`, photo, businessBio, lat, lng });
   }
 
   return (
@@ -1091,7 +1292,8 @@ function EmployerForm({ onSubmit, onBack, saving }) {
         <div style={{ flex: 1 }}><Field label="City *"><input style={inputStyle} value={city} onChange={e => setCity(capWords(e.target.value))} placeholder="Austin" /></Field></div>
         <div style={{ flex: 1 }}><Field label="Country *"><input style={inputStyle} value={country} onChange={e => setCountry(capWords(e.target.value))} placeholder="USA" /></Field></div>
       </div>
-      <LocationCaptureButton lat={lat} lng={lng} onCapture={(la, lo) => { setLat(la); setLng(lo); }} />
+      <LocationCaptureButton lat={lat} lng={lng} onCapture={(la, lo) => { setLat(la); setLng(lo); toast("📍 Location saved"); }} label="Share my location *" required />
+      <Field label="About your business (optional)"><textarea style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} value={businessBio} onChange={e => setBusinessBio(e.target.value)} placeholder="What should candidates know about working with you?" /></Field>
       {error && <div style={{ color: "#E14B5A", fontSize: 13, marginBottom: 10 }}>{error}</div>}
       <PrimaryBtn onClick={submit} disabled={saving}>{saving ? "Creating account..." : "Create employer account"}</PrimaryBtn>
       <div style={{ height: 10 }} />
@@ -1154,6 +1356,7 @@ function PostJobScreen({ employer, onDone, onSkip, isEdit, existing }) {
     await addToList("kiver:job-ids", job.id);
     await addToList("kiver:employer-jobs:" + employer.id, job.id);
     setSaving(false);
+    toast(isEdit ? "✓ Job updated" : "✓ Job posted");
     onDone(job);
   }
 
@@ -1214,8 +1417,8 @@ function PostJobScreen({ employer, onDone, onSkip, isEdit, existing }) {
 /* ============================== APP SHELL ============================== */
 function AppShell({ me, tab, setTab, refreshMe, logout }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 580 }}>
-      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", paddingBottom: 84 }}>
         {tab === "discover" && <DiscoverTab me={me} refreshMe={refreshMe} goToProfile={() => setTab("profile")} />}
         {tab === "matches" && <MatchesTab me={me} />}
         {tab === "post" && <PostTab me={me} goToProfile={() => setTab("profile")} />}
@@ -1234,7 +1437,12 @@ function BottomNav({ tab, setTab, isEmployer }) {
     { k: "profile", label: "Profile", icon: User },
   ];
   return (
-    <div style={{ display: "flex", borderTop: `1px solid ${C.line}`, background: C.bg2, flexShrink: 0, padding: "4px 6px" }}>
+    <div style={{
+      position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 50,
+      width: "calc(100% - 32px)", maxWidth: 408,
+      display: "flex", background: "#fff", borderRadius: 20, padding: "6px 6px",
+      boxShadow: "0 12px 32px #13204330, 0 2px 8px #13204318", border: `1px solid ${C.line}`
+    }}>
       {items.map(({ k, label, icon: Icon }) => {
         const active = tab === k;
         return (
@@ -1262,7 +1470,7 @@ const labelBaseStyle = {
   fontFamily: "'Poppins', sans-serif", background: "#FFFFFFcc", backdropFilter: "blur(2px)"
 };
 
-function SwipeCard({ data, isWorker, trigger, onExitComplete }) {
+function SwipeCard({ data, isWorker, trigger, onExitComplete, me, onBlock, onReport }) {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [exiting, setExiting] = useState(null);
@@ -1327,7 +1535,7 @@ function SwipeCard({ data, isWorker, trigger, onExitComplete }) {
         touchAction: "none", cursor: dragging ? "grabbing" : "grab", zIndex: 3
       }}
     >
-      {isWorker ? <JobCard job={data} /> : <WorkerCard worker={data} />}
+      {isWorker ? <JobCard job={data} me={me} onBlock={onBlock} onReport={onReport} /> : <WorkerCard worker={data} me={me} onBlock={onBlock} onReport={onReport} />}
       <div style={{ ...labelBaseStyle, left: 18, borderColor: C.blue, color: C.blue, opacity: likeOpacity, transform: `rotate(-16deg) scale(${0.85 + likeOpacity * 0.15})` }}>LIKE</div>
       <div style={{ ...labelBaseStyle, right: 18, borderColor: C.steelDark, color: C.steelDark, opacity: nopeOpacity, transform: `rotate(16deg) scale(${0.85 + nopeOpacity * 0.15})` }}>NOPE</div>
     </div>
@@ -1347,19 +1555,114 @@ function PeekCard({ data, isWorker, depth }) {
 }
 
 /* ============================== DISCOVER (SWIPE DECK) ============================== */
-function SwipeLimitCard({ isWorker, onUpgrade }) {
+function SwipeLimitModal({ isWorker, onUpgrade, onClose }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center", padding: 26 }}>
+    <div style={{
+      position: "absolute", inset: 0, background: "#0F1922B8", display: "flex", alignItems: "center",
+      justifyContent: "center", zIndex: 40, padding: 24
+    }} className="fadeup">
       <div style={{
-        width: 64, height: 64, borderRadius: "50%", background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`,
-        display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 16, boxShadow: "0 10px 24px #0B6EFC40"
-      }}><Zap size={28} color="#fff" /></div>
-      <div className="disp" style={{ fontWeight: 800, fontSize: 19, color: C.ink }}>You're out of swipes for today</div>
-      <p style={{ color: C.inkDim, fontSize: 13.5, marginTop: 8, lineHeight: 1.5, maxWidth: 260 }}>
-        Free accounts get {FREE_DAILY_SWIPE_CAP} swipes a day. Go Premium for unlimited swipes{isWorker ? ", 2x exposure to employers" : ", and first look at the best profiles"}, and more.
-      </p>
-      <PrimaryBtn onClick={onUpgrade} style={{ marginTop: 18 }}>See Premium</PrimaryBtn>
-      <div style={{ color: C.inkDim, fontSize: 12, marginTop: 10 }}>Your swipes reset tomorrow.</div>
+        background: "#fff", borderRadius: 22, padding: 26, width: "100%", maxWidth: 340,
+        boxShadow: "0 24px 60px #13204345", position: "relative", textAlign: "center"
+      }}>
+        <button onClick={onClose} style={{
+          position: "absolute", top: 14, right: 14, background: C.bg, border: "none", borderRadius: "50%",
+          width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center", color: C.inkDim
+        }}><IconX size={14} /></button>
+
+        <div style={{
+          width: 64, height: 64, borderRadius: "50%", background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`,
+          display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", boxShadow: "0 10px 24px #0B6EFC40"
+        }}><Zap size={28} color="#fff" /></div>
+
+        <div className="disp" style={{ fontWeight: 800, fontSize: 20, color: C.ink }}>Out of swipes for today</div>
+        <p style={{ color: C.inkDim, fontSize: 13.5, marginTop: 8, lineHeight: 1.5 }}>
+          Free accounts get {FREE_DAILY_SWIPE_CAP} swipes a day. Kiver Premium removes the cap completely.
+        </p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16, textAlign: "left" }}>
+          {[
+            "Unlimited swipes, every day",
+            isWorker ? "2x exposure to employers" : "Priority placement — see the best profiles first",
+            "Unlimited undos",
+          ].map((t, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.blueSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Check size={11} color={C.blue} strokeWidth={3} />
+              </div>
+              <span style={{ fontSize: 13, color: C.ink }}>{t}</span>
+            </div>
+          ))}
+        </div>
+
+        <PrimaryBtn onClick={onUpgrade} style={{ marginTop: 20 }}>See Premium</PrimaryBtn>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: C.inkDim, fontSize: 12.5, fontWeight: 600, marginTop: 12, padding: 0 }}>
+          Maybe later
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PitchModal({ title, icon, subtitle, maxLen, confirmLabel, onClose, onSubmit }) {
+  const [text, setText] = useState("");
+  return (
+    <div style={{
+      position: "absolute", inset: 0, background: "#0F1922B8", display: "flex", alignItems: "center",
+      justifyContent: "center", zIndex: 45, padding: 24
+    }} className="fadeup">
+      <div style={{ background: "#fff", borderRadius: 22, padding: 24, width: "100%", maxWidth: 340, boxShadow: "0 24px 60px #13204345" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          {icon}
+          <span className="disp" style={{ fontWeight: 800, fontSize: 19, color: C.ink }}>{title}</span>
+        </div>
+        <p style={{ color: C.inkDim, fontSize: 13, marginBottom: 14 }}>{subtitle}</p>
+        <textarea
+          value={text} onChange={e => setText(e.target.value.slice(0, maxLen))}
+          placeholder="Write your message..."
+          style={{ ...inputStyle, minHeight: 90, resize: "vertical", marginBottom: 6 }}
+        />
+        <div style={{ textAlign: "right", fontSize: 11.5, color: C.inkDim, marginBottom: 14 }}>{text.length}/{maxLen}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <GhostBtn onClick={onClose}>Cancel</GhostBtn>
+          <PrimaryBtn onClick={() => text.trim() && onSubmit(text.trim())} disabled={!text.trim()}>{confirmLabel}</PrimaryBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PremiumFeatureModal({ feature, onClose, onUpgrade }) {
+  const copy = feature === "super"
+    ? { title: "Super Pitch is Premium", desc: "Attach a short note to your like so you don't just blend into the deck." }
+    : { title: "Direct Pitch is Premium", desc: "Message an employer or candidate directly, before you've even matched." };
+  return (
+    <div style={{
+      position: "absolute", inset: 0, background: "#0F1922B8", display: "flex", alignItems: "center",
+      justifyContent: "center", zIndex: 45, padding: 24
+    }} className="fadeup">
+      <div style={{ background: "#fff", borderRadius: 22, padding: 26, width: "100%", maxWidth: 340, textAlign: "center", boxShadow: "0 24px 60px #13204345" }}>
+        <div style={{
+          width: 60, height: 60, borderRadius: "50%", background: "linear-gradient(135deg, #8B5CF6, #6D28D9)",
+          display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", boxShadow: "0 10px 24px #8B5CF640"
+        }}><Sparkles size={26} color="#fff" /></div>
+        <div className="disp" style={{ fontWeight: 800, fontSize: 19, color: C.ink }}>{copy.title}</div>
+        <p style={{ color: C.inkDim, fontSize: 13.5, marginTop: 8, lineHeight: 1.5 }}>{copy.desc}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16, textAlign: "left" }}>
+          {["Super Pitches — a note attached to your like", "Direct Pitches — message before you match", "Everything else in Kiver Premium"].map((t, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#F3EBFF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Check size={11} color="#8B5CF6" strokeWidth={3} />
+              </div>
+              <span style={{ fontSize: 13, color: C.ink }}>{t}</span>
+            </div>
+          ))}
+        </div>
+        <PrimaryBtn onClick={onUpgrade} style={{ marginTop: 20 }}>See Premium</PrimaryBtn>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: C.inkDim, fontSize: 12.5, fontWeight: 600, marginTop: 12, padding: 0 }}>
+          Maybe later
+        </button>
+      </div>
     </div>
   );
 }
@@ -1382,9 +1685,15 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
   const [myCoords, setMyCoords] = useState(me.lat != null && me.lng != null ? { lat: me.lat, lng: me.lng } : null);
   const [locStatus, setLocStatus] = useState("idle"); // idle | loading | granted | denied
   const [radiusFilter, setRadiusFilter] = useState(WORLDWIDE_MILES);
+  const [showLimitModal, setShowLimitModal] = useState(true);
 
   const isWorker = me.type === "worker";
   const premiumActive = isPremiumActive(me);
+  const capReachedNow = !premiumActive && usage.count >= FREE_DAILY_SWIPE_CAP;
+
+  useEffect(() => {
+    if (capReachedNow) setShowLimitModal(true);
+  }, [capReachedNow]);
 
   const enableLocation = useCallback(async () => {
     setLocStatus("loading");
@@ -1393,8 +1702,10 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
       setMyCoords(coords);
       setLocStatus("granted");
       sSet("kiver:user:" + me.id, { ...me, lat: coords.lat, lng: coords.lng }, true);
+      toast("📍 Location updated");
     } catch (e) {
       setLocStatus("denied");
+      toast("Couldn't get your location", "error");
     }
   }, [me]);
 
@@ -1405,17 +1716,25 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
 
   const loadDeck = useCallback(async () => {
     const mySwipes = await getJSON("kiver:swipes:" + me.id, true, {});
+    const myBlocked = await getJSON("kiver:blocked:" + me.id, true, []);
     const now = Date.now();
     if (isWorker) {
       const jobIds = await getJSON("kiver:job-ids", true, []);
       const jobs = (await Promise.all(jobIds.map(id => getJSON("kiver:job:" + id, true, null)))).filter(Boolean);
       const employers = {};
+      const employerSwipes = {};
+      const employerJobCounts = {};
       for (const j of jobs) {
-        if (!employers[j.employerId]) employers[j.employerId] = await getJSON("kiver:user:" + j.employerId, true, null);
+        if (!(j.employerId in employers)) {
+          employers[j.employerId] = await getJSON("kiver:user:" + j.employerId, true, null);
+          employerSwipes[j.employerId] = await getJSON("kiver:swipes:" + j.employerId, true, {});
+          employerJobCounts[j.employerId] = (await getJSON("kiver:employer-jobs:" + j.employerId, true, [])).length;
+        }
       }
       const search = searchText.trim().toLowerCase();
       let candidates = jobs
         .filter(j => !(j.id in mySwipes))
+        .filter(j => !myBlocked.includes(j.employerId))
         .filter(j => {
           const displayTitle = j.title === "Custom" ? j.customTitle : j.title;
           if (search) {
@@ -1432,9 +1751,19 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
         .map(j => ({
           ...j, _employer: employers[j.employerId],
           _distanceMiles: myCoords ? haversineMiles(myCoords.lat, myCoords.lng, j.lat, j.lng) : null,
+          _alreadyInterested: employerSwipes[j.employerId]?.[me.id] === "right",
+          _employerActivelyHiring: (employerJobCounts[j.employerId] || 0) >= 2,
         }))
         .filter(j => j._employer)
         .filter(j => radiusFilter >= WORLDWIDE_MILES || (j._distanceMiles != null && j._distanceMiles <= radiusFilter));
+
+      // exclude jobs from employers who have blocked me
+      const filteredForBlocks = [];
+      for (const j of candidates) {
+        const theirBlocked = await getJSON("kiver:blocked:" + j.employerId, true, []);
+        if (!theirBlocked.includes(me.id)) filteredForBlocks.push(j);
+      }
+      candidates = filteredForBlocks;
 
       const filledCounts = {};
       for (const j of candidates) {
@@ -1454,15 +1783,26 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
     } else {
       const userIds = await getJSON("kiver:user-ids", true, []);
       const users = (await Promise.all(userIds.map(id => getJSON("kiver:user:" + id, true, null)))).filter(Boolean);
+      const myJobIds = await getJSON("kiver:employer-jobs:" + me.id, true, []);
       let candidates = users
         .filter(u => u.type === "worker")
         .filter(u => !(u.id in mySwipes))
-        .filter(u => premiumActive || (now - u.createdAt >= EARLY_ACCESS_MS))
-        .map(u => ({
+        .filter(u => !myBlocked.includes(u.id))
+        .filter(u => premiumActive || (now - u.createdAt >= EARLY_ACCESS_MS));
+
+      const withSwipes = [];
+      for (const u of candidates) {
+        const theirBlocked = await getJSON("kiver:blocked:" + u.id, true, []);
+        if (theirBlocked.includes(me.id)) continue;
+        const theirSwipes = await getJSON("kiver:swipes:" + u.id, true, {});
+        const alreadyInterested = myJobIds.some(jId => theirSwipes[jId] === "right");
+        withSwipes.push({
           ...u,
           _distanceMiles: myCoords ? haversineMiles(myCoords.lat, myCoords.lng, u.lat, u.lng) : null,
-        }))
-        .filter(u => radiusFilter >= WORLDWIDE_MILES || (u._distanceMiles != null && u._distanceMiles <= radiusFilter));
+          _alreadyInterested: alreadyInterested,
+        });
+      }
+      candidates = withSwipes.filter(u => radiusFilter >= WORLDWIDE_MILES || (u._distanceMiles != null && u._distanceMiles <= radiusFilter));
       if (premiumActive) {
         if (sponsorFilter !== "Any") candidates = candidates.filter(u => u.sponsorship === sponsorFilter);
         if (locFilter.trim()) candidates = candidates.filter(u => u.location.toLowerCase().includes(locFilter.trim().toLowerCase()));
@@ -1475,13 +1815,41 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
 
   useEffect(() => { loadDeck(); }, [loadDeck]);
 
+  async function blockCurrent() {
+    if (!deck || idx >= deck.length) return;
+    const target = deck[idx];
+    const targetId = isWorker ? target.employerId : target.id;
+    const list = await getJSON("kiver:blocked:" + me.id, true, []);
+    if (!list.includes(targetId)) {
+      await sSet("kiver:blocked:" + me.id, [...list, targetId], true);
+    }
+    toast("Blocked");
+    setIdx(i => i + 1);
+  }
+
+  async function reportCurrent(reason) {
+    if (!deck || idx >= deck.length) return;
+    const target = deck[idx];
+    const targetId = isWorker ? target.employerId : target.id;
+    const reports = await getJSON("kiver:reports", true, []);
+    reports.push({ id: uid(), reporterId: me.id, targetId, targetType: isWorker ? "job/employer" : "worker", reason, createdAt: Date.now() });
+    await sSet("kiver:reports", reports, true);
+  }
+
   function currentCredits() {
     return me.swipeCredits && me.swipeCredits.date === todayStr() ? me.swipeCredits : { date: todayStr(), used: 0 };
   }
 
+  const pendingPitchRef = useRef(null);
+  const [showSuperPitchModal, setShowSuperPitchModal] = useState(false);
+  const [showDirectPitchModal, setShowDirectPitchModal] = useState(false);
+  const [premiumFeatureModal, setPremiumFeatureModal] = useState(null); // null | "super" | "direct"
+
   async function commitSwipe(direction) {
     const target = deck[idx];
     const targetId = target.id;
+    const pitchText = direction === "right" ? pendingPitchRef.current : null;
+    pendingPitchRef.current = null;
 
     const mySwipes = await getJSON("kiver:swipes:" + me.id, true, {});
     mySwipes[targetId] = direction;
@@ -1517,8 +1885,20 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
         await addToList("kiver:matches-for:" + workerId, mId);
         await addToList("kiver:matches-for:" + employerId, mId);
         await addToList("kiver:job-matches:" + jobId, mId);
-        await sSet("kiver:chat:" + mId, [], true);
+        const openingMsgs = pitchText ? [{ sender: me.id, text: `⭐ ${pitchText}`, time: Date.now() }] : [];
+        await sSet("kiver:chat:" + mId, openingMsgs, true);
         setMatchPopup({ match, other: isWorker ? target._employer : target });
+      } else if (pitchText) {
+        const toId = isWorker ? target.employerId : target.id;
+        const pitches = await getJSON("kiver:pitches-for:" + toId, true, []);
+        pitches.push({
+          id: uid(), fromId: me.id, fromName: me.name, fromPhoto: me.photo, fromType: me.type,
+          text: pitchText, type: "super", jobId: isWorker ? target.id : null, targetId, createdAt: Date.now(),
+        });
+        await sSet("kiver:pitches-for:" + toId, pitches, true);
+        toast("⭐ Super Pitch sent");
+      } else {
+        toast("❤️ Liked");
       }
     }
     setIdx(i => i + 1);
@@ -1528,6 +1908,35 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
   function buttonSwipe(dir) {
     if (!deck || idx >= deck.length) return;
     setTrigger({ dir, nonce: Date.now() });
+  }
+
+  function tapSuperPitch() {
+    if (!premiumActive) { setPremiumFeatureModal("super"); return; }
+    if (!deck || idx >= deck.length) return;
+    setShowSuperPitchModal(true);
+  }
+  function tapDirectPitch() {
+    if (!premiumActive) { setPremiumFeatureModal("direct"); return; }
+    if (!deck || idx >= deck.length) return;
+    setShowDirectPitchModal(true);
+  }
+  function submitSuperPitch(text) {
+    pendingPitchRef.current = text;
+    setShowSuperPitchModal(false);
+    buttonSwipe("right");
+  }
+  async function submitDirectPitch(text) {
+    const target = deck[idx];
+    if (!target) return;
+    const toId = isWorker ? target.employerId : target.id;
+    const pitches = await getJSON("kiver:pitches-for:" + toId, true, []);
+    pitches.push({
+      id: uid(), fromId: me.id, fromName: me.name, fromPhoto: me.photo, fromType: me.type,
+      text, type: "direct", jobId: isWorker ? target.id : null, createdAt: Date.now(),
+    });
+    await sSet("kiver:pitches-for:" + toId, pitches, true);
+    setShowDirectPitchModal(false);
+    toast("✈️ Message sent");
   }
 
   async function undoSwipe() {
@@ -1548,26 +1957,17 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
 
   if (!deck) return <div style={{ padding: 30, color: C.inkDim }}>Loading...</div>;
 
-  const capReached = !premiumActive && usage.count >= FREE_DAILY_SWIPE_CAP;
+  const capReached = capReachedNow;
   const current = deck[idx];
   const peek = deck.slice(idx + 1, idx + 3);
   const credits = currentCredits();
   const undoAvailable = lastAction && (premiumActive || credits.used < 1);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, position: "relative" }}>
       <div style={{ padding: "14px 16px 8px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Logo size={26} />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {!myCoords && (
-            <button onClick={enableLocation} style={{
-              display: "flex", alignItems: "center", gap: 4, background: locStatus === "denied" ? "#FFF0F0" : C.blueSoft,
-              color: locStatus === "denied" ? "#D62A2A" : C.blue, border: "none", borderRadius: 20, padding: "6px 10px",
-              fontSize: 11, fontWeight: 700
-            }}>
-              <MapPin size={12} /> {locStatus === "loading" ? "Locating..." : locStatus === "denied" ? "Location off" : "Enable location"}
-            </button>
-          )}
           {!premiumActive && (
             <span style={{ fontSize: 11.5, fontWeight: 700, color: C.inkDim }}>
               {Math.max(0, FREE_DAILY_SWIPE_CAP - usage.count)} swipes left
@@ -1578,6 +1978,26 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
             color: C.blue, display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 700
           }}>Filters <ChevronDown size={14} /></button>
         </div>
+      </div>
+
+      <div style={{
+        margin: "0 16px 10px", padding: "9px 12px", borderRadius: 12,
+        background: myCoords ? C.blueSoft : "#FFF4D6",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          <MapPin size={14} color={myCoords ? C.blue : C.goldDark} style={{ flexShrink: 0 }} />
+          <span style={{
+            fontSize: 12.5, fontWeight: 700, color: myCoords ? C.blue : C.goldDark,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"
+          }}>
+            {myCoords ? `Showing ${isWorker ? "jobs" : "workers"} near ${me.location}` : "Location off — showing everyone, everywhere"}
+          </span>
+        </div>
+        <button onClick={enableLocation} style={{
+          flexShrink: 0, background: myCoords ? "#fff" : C.gold, color: myCoords ? C.blue : "#5A3B00",
+          border: "none", borderRadius: 20, padding: "6px 11px", fontSize: 11, fontWeight: 700
+        }}>{locStatus === "loading" ? "..." : "Change"}</button>
       </div>
 
       {showFilters && (
@@ -1638,7 +2058,20 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
       )}
 
       <div style={{ flex: 1, position: "relative", padding: "4px 16px 12px", minHeight: 0 }}>
-        {capReached && <SwipeLimitCard isWorker={isWorker} onUpgrade={goToProfile} />}
+        {capReached && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: C.inkDim, textAlign: "center", padding: 20 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: "50%", background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`,
+              display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14, boxShadow: "0 10px 24px #0B6EFC40"
+            }}><Zap size={26} color="#fff" /></div>
+            <div style={{ fontWeight: 700, color: C.ink, marginBottom: 4 }}>You're out of swipes for today</div>
+            <div style={{ fontSize: 13 }}>Your swipes reset tomorrow.</div>
+            <button onClick={() => setShowLimitModal(true)} style={{
+              marginTop: 14, background: C.blueSoft, color: C.blue, border: "none", borderRadius: 20,
+              padding: "8px 14px", fontSize: 12.5, fontWeight: 700
+            }}>See Premium</button>
+          </div>
+        )}
         {!capReached && !current && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: C.inkDim, textAlign: "center", padding: 20 }}>
             <div style={{ width: 60, height: 60, borderRadius: "50%", background: C.blueSoft, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
@@ -1652,18 +2085,58 @@ function DiscoverTab({ me, refreshMe, goToProfile }) {
           <PeekCard key={p.id} data={p} isWorker={isWorker} depth={peek.length - i} />
         ))}
         {!capReached && current && (
-          <SwipeCard key={current.id} data={current} isWorker={isWorker} trigger={trigger} onExitComplete={commitSwipe} />
+          <SwipeCard key={current.id} data={current} isWorker={isWorker} trigger={trigger} onExitComplete={commitSwipe} me={me} onBlock={blockCurrent} onReport={reportCurrent} />
         )}
       </div>
 
       {!capReached && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 20, padding: "8px 16px 18px", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "8px 10px 18px", alignItems: "center" }}>
           <CircleBtn onClick={undoSwipe} disabled={!undoAvailable} title={premiumActive ? "Undo (unlimited)" : `Undo (${1 - credits.used} left today)`} tone="gold-outline">
             <RotateCcw size={17} />
           </CircleBtn>
+          <CircleBtn onClick={tapSuperPitch} title="Super Pitch — stand out with a message" tone="purple-outline">
+            <Star size={17} fill={premiumActive ? "#8B5CF6" : "none"} />
+          </CircleBtn>
           <CircleBtn big onClick={() => buttonSwipe("left")} tone="steel-outline"><IconX size={26} /></CircleBtn>
           <CircleBtn big onClick={() => buttonSwipe("right")} tone="blue"><Heart size={24} fill="#fff" /></CircleBtn>
+          <CircleBtn onClick={tapDirectPitch} title="Direct Pitch — message before a match" tone="blue-outline">
+            <SendIcon size={16} />
+          </CircleBtn>
         </div>
+      )}
+
+      {capReached && showLimitModal && (
+        <SwipeLimitModal isWorker={isWorker} onUpgrade={goToProfile} onClose={() => setShowLimitModal(false)} />
+      )}
+
+      {showSuperPitchModal && (
+        <PitchModal
+          title="Super Pitch"
+          icon={<Star size={26} color="#8B5CF6" fill="#8B5CF6" />}
+          subtitle="Stand out with a short note — this sends along with your like."
+          maxLen={100}
+          confirmLabel="Send Super Pitch"
+          onClose={() => setShowSuperPitchModal(false)}
+          onSubmit={submitSuperPitch}
+        />
+      )}
+      {showDirectPitchModal && (
+        <PitchModal
+          title="Direct Pitch"
+          icon={<SendIcon size={22} color={C.blue} />}
+          subtitle={`Message this ${isWorker ? "employer" : "candidate"} directly — no match needed.`}
+          maxLen={300}
+          confirmLabel="Send Message"
+          onClose={() => setShowDirectPitchModal(false)}
+          onSubmit={submitDirectPitch}
+        />
+      )}
+      {premiumFeatureModal && (
+        <PremiumFeatureModal
+          feature={premiumFeatureModal}
+          onClose={() => setPremiumFeatureModal(null)}
+          onUpgrade={() => { setPremiumFeatureModal(null); goToProfile && goToProfile(); }}
+        />
       )}
 
       {matchPopup && <MatchPopup me={me} data={matchPopup} onClose={() => setMatchPopup(null)} />}
@@ -1677,17 +2150,20 @@ function CircleBtn({ children, onClick, disabled, big, tone, title }) {
     blue: { background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`, color: "#fff", border: "none", boxShadow: "0 10px 22px #0B6EFC4d" },
     "steel-outline": { background: "#fff", color: C.steelDark, border: `2px solid ${C.line}`, boxShadow: "0 6px 16px #13204314" },
     "gold-outline": { background: "#fff", color: C.goldDark, border: `2px solid #FFE4A0`, boxShadow: "0 6px 16px #13204314" },
+    "purple-outline": { background: "#fff", color: "#8B5CF6", border: "2px solid #E4D9FC", boxShadow: "0 6px 16px #13204314" },
+    "blue-outline": { background: "#fff", color: C.blue, border: `2px solid ${C.blueSoft}`, boxShadow: "0 6px 16px #13204314" },
   };
   const s = styles[tone] || styles["steel-outline"];
   return (
     <button onClick={onClick} disabled={disabled} title={title} style={{
       width: sizes, height: sizes, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-      opacity: disabled ? 0.35 : 1, ...s
+      opacity: disabled ? 0.35 : 1, position: "relative", ...s
     }}>{children}</button>
   );
 }
 
-function JobCard({ job }) {
+function JobCard({ job, me, onBlock, onReport }) {
+  const [expanded, setExpanded] = useState(false);
   const displayTitle = job.title === "Custom" ? job.customTitle : job.title;
   const isUrgent = job.urgent && (!job.urgentUntil || job.urgentUntil > Date.now());
   const slots = job.slots || 1;
@@ -1695,38 +2171,104 @@ function JobCard({ job }) {
     <div style={{
       height: "100%", borderRadius: 22, overflow: "hidden", position: "relative",
       background: `linear-gradient(180deg, transparent 38%, #0B1830EE 100%), url(${job.photos[0]}) center/cover no-repeat`,
-      border: isUrgent ? `2px solid #FF4D4D` : `1px solid ${C.line}`, display: "flex", flexDirection: "column", justifyContent: "flex-end", padding: 18,
+      border: isUrgent ? `2px solid #FF4D4D` : `1px solid ${C.line}`, display: "flex", flexDirection: "column", justifyContent: "flex-end",
       boxShadow: isUrgent ? "0 16px 40px #FF4D4D33" : "0 16px 40px #13204322"
     }}>
-      <div style={{ position: "absolute", top: 14, left: 14, display: "flex", gap: 6, flexWrap: "wrap", maxWidth: "80%" }}>
+      <div style={{ position: "absolute", top: 14, left: 14, right: 48, display: "flex", gap: 6, flexWrap: "wrap" }}>
         {isUrgent && (
           <span style={{ display: "flex", alignItems: "center", gap: 4, background: "#FF3B3B", color: "#fff", fontSize: 11, fontWeight: 800, padding: "4px 9px", borderRadius: 20 }}>
             <Siren size={11} /> URGENT
           </span>
         )}
+        {job._alreadyInterested && <Badge tone="good">💙 Interested in you</Badge>}
         {isPremiumActive(job._employer) && <Badge tone="gold">Featured</Badge>}
+        {job._employerActivelyHiring && <Badge tone="accent">Actively Hiring</Badge>}
         <Badge tone="dark">{job.photos.length} photo{job.photos.length > 1 ? "s" : ""}</Badge>
         {slots > 1 && <Badge tone="accent">{job._filled || 0}/{slots} filled</Badge>}
       </div>
-      <div className="disp" style={{ fontSize: 27, fontWeight: 800, color: "#fff" }}>{displayTitle}</div>
-      <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 14, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-        {job._employer?.name}{showVerified(job._employer) && <VerifiedTick size={14} />}
+
+      <CardSafetyMenu targetName={displayTitle} targetType="listing" onBlock={onBlock} onReport={onReport} />
+
+      <div style={{ padding: 18 }}>
+        <div className="disp" style={{ fontSize: 27, fontWeight: 800, color: "#fff" }}>{displayTitle}</div>
+        <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 14, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+          {job._employer?.name}{showVerified(job._employer) && <VerifiedTick size={14} />}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#D6DEEF", fontSize: 13, marginTop: 6 }}>
+          <MapPin size={13} /> {job.location}
+          {job._distanceMiles != null && <span style={{ color: "#8FC1FF", fontWeight: 700 }}>&middot; {formatDistance(job._distanceMiles)}</span>}
+        </div>
+        <div style={{ color: "#fff", fontSize: 14, marginTop: 6, fontWeight: 600 }}>{job.pay}</div>
+        {job.description && <div style={{ color: "#C2CCE2", fontSize: 12.5, marginTop: 6, lineHeight: 1.4 }}>{job.description.slice(0, 110)}{job.description.length > 110 ? "..." : ""}</div>}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+          {job.sponsorship === "Yes" && <Badge tone="good">Sponsorship offered</Badge>}
+          {job.tags.slice(0, 3).map((t, i) => <Badge key={i} tone="steel">{t}</Badge>)}
+        </div>
+        <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setExpanded(true)} style={{
+          marginTop: 10, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+          background: "#FFFFFF22", border: "none", borderRadius: 10, padding: "8px 10px", color: "#fff", fontSize: 12, fontWeight: 700
+        }}><ChevronDown size={14} /> See full details</button>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 5, color: "#D6DEEF", fontSize: 13, marginTop: 6 }}>
-        <MapPin size={13} /> {job.location}
-        {job._distanceMiles != null && <span style={{ color: "#8FC1FF", fontWeight: 700 }}>&middot; {formatDistance(job._distanceMiles)}</span>}
-      </div>
-      <div style={{ color: "#fff", fontSize: 14, marginTop: 6, fontWeight: 600 }}>{job.pay}</div>
-      {job.description && <div style={{ color: "#C2CCE2", fontSize: 12.5, marginTop: 6, lineHeight: 1.4 }}>{job.description.slice(0, 110)}{job.description.length > 110 ? "..." : ""}</div>}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-        {job.sponsorship === "Yes" && <Badge tone="good">Sponsorship offered</Badge>}
-        {job.tags.slice(0, 3).map((t, i) => <Badge key={i} tone="steel">{t}</Badge>)}
-      </div>
+
+      {expanded && (
+        <div onPointerDown={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} style={{
+          position: "absolute", inset: 0, background: "#0F1922F5", zIndex: 6,
+          display: "flex", flexDirection: "column", touchAction: "pan-y"
+        }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 14px 0" }}>
+            <button type="button" onClick={() => setExpanded(false)} style={{
+              background: "#FFFFFF22", border: "none", borderRadius: "50%", width: 30, height: 30,
+              display: "flex", alignItems: "center", justifyContent: "center", color: "#fff"
+            }}><IconX size={16} /></button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "8px 18px 20px", touchAction: "pan-y" }}>
+            <div className="disp" style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>{displayTitle}</div>
+            <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 13.5, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              {job._employer?.name}{showVerified(job._employer) && <VerifiedTick size={13} />}
+            </div>
+
+            {job.photos.length > 0 && (
+              <div style={{ display: "flex", gap: 8, marginTop: 16, overflowX: "auto" }}>
+                {job.photos.map((p, i) => (
+                  <div key={i} style={{ width: 140, height: 105, borderRadius: 12, background: `url(${p}) center/cover`, flexShrink: 0, border: "1px solid #ffffff22" }} />
+                ))}
+              </div>
+            )}
+
+            <div style={{ marginTop: 18 }}>
+              <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 11.5, letterSpacing: "0.06em", marginBottom: 8 }}>PAY & DETAILS</div>
+              <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>{job.pay}</div>
+              <div style={{ color: "#D6DEEF", fontSize: 13, marginTop: 4 }}>{job.location}</div>
+            </div>
+
+            {job.description && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 11.5, letterSpacing: "0.06em", marginBottom: 8 }}>ABOUT THE JOB</div>
+                <div style={{ color: "#D6DEEF", fontSize: 13.5, lineHeight: 1.5 }}>{job.description}</div>
+              </div>
+            )}
+
+            {job._employer?.businessBio && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 11.5, letterSpacing: "0.06em", marginBottom: 8 }}>ABOUT {job._employer.name?.toUpperCase()}</div>
+                <div style={{ color: "#D6DEEF", fontSize: 13.5, lineHeight: 1.5 }}>{job._employer.businessBio}</div>
+              </div>
+            )}
+
+            {job.tags.length > 0 && (
+              <div style={{ marginTop: 18, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {job.tags.map((t, i) => <Badge key={i} tone="steel">{t}</Badge>)}
+              </div>
+            )}
+            {job.sponsorship === "Yes" && <div style={{ marginTop: 12 }}><Badge tone="good">Sponsorship offered</Badge></div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function WorkerCard({ worker }) {
+function WorkerCard({ worker, me, onBlock, onReport }) {
   const [expanded, setExpanded] = useState(false);
   const photos = worker.photos && worker.photos.length ? worker.photos : (worker.photo ? [worker.photo] : []);
 
@@ -1737,6 +2279,14 @@ function WorkerCard({ worker }) {
       border: `1px solid ${C.line}`, display: "flex", flexDirection: "column", justifyContent: "flex-end",
       boxShadow: "0 16px 40px #13204322"
     }}>
+      {(worker._alreadyInterested) && (
+        <div style={{ position: "absolute", top: 14, left: 14, right: 48 }}>
+          <Badge tone="good">💙 Interested in you</Badge>
+        </div>
+      )}
+
+      <CardSafetyMenu targetName={worker.name} targetType="profile" onBlock={onBlock} onReport={onReport} />
+
       <div style={{ padding: 18 }}>
         <div className="disp" style={{ fontSize: 27, fontWeight: 800, color: "#fff", display: "flex", alignItems: "center", gap: 8 }}>
           {worker.name}{showVerified(worker) && <VerifiedTick size={16} />}
@@ -1748,6 +2298,12 @@ function WorkerCard({ worker }) {
         {worker.abilities && worker.abilities.length > 0 && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
             {worker.abilities.slice(0, 3).map((a, i) => <Badge key={i} tone="dark">{a}</Badge>)}
+          </div>
+        )}
+        {(worker.workStyle || worker.availability) && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+            {worker.workStyle && <Badge tone="accent">{worker.workStyle}</Badge>}
+            {worker.availability && <Badge tone="gold">{worker.availability}</Badge>}
           </div>
         )}
         <button type="button" onPointerDown={e => e.stopPropagation()} onClick={() => setExpanded(true)} style={{
@@ -1793,10 +2349,31 @@ function WorkerCard({ worker }) {
               </div>
             )}
 
+            {(worker.workStyle || worker.availability) && (
+              <div style={{ marginTop: 18 }}>
+                <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 11.5, letterSpacing: "0.06em", marginBottom: 8 }}>WORK STYLE</div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {worker.workStyle && <Badge tone="accent">{worker.workStyle}</Badge>}
+                  {worker.availability && <Badge tone="gold">{worker.availability}</Badge>}
+                </div>
+              </div>
+            )}
+
             <div style={{ marginTop: 18 }}>
               <div style={{ color: "#8FC1FF", fontWeight: 700, fontSize: 11.5, letterSpacing: "0.06em", marginBottom: 8 }}>ABOUT</div>
               <div style={{ color: "#D6DEEF", fontSize: 13.5, lineHeight: 1.5 }}>{worker.bio ? worker.bio : "No bio added yet."}</div>
             </div>
+
+            {worker.prompts && worker.prompts.filter(p => p.answer?.trim()).length > 0 && (
+              <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 10 }}>
+                {worker.prompts.filter(p => p.answer?.trim()).map((p, i) => (
+                  <div key={i} style={{ background: "#FFFFFF14", borderRadius: 14, padding: 14, border: "1px solid #ffffff22" }}>
+                    <div style={{ color: "#8FC1FF", fontSize: 11.5, fontWeight: 700, marginBottom: 5 }}>{p.prompt}</div>
+                    <div style={{ color: "#fff", fontSize: 14, lineHeight: 1.4 }}>{p.answer}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ marginTop: 18, marginBottom: 4 }}>
               <Badge tone={worker.sponsorship?.startsWith("Needs") ? "gold" : "steel"}>{worker.sponsorship}</Badge>
@@ -1831,6 +2408,7 @@ function MatchPopup({ me, data, onClose }) {
 /* ============================== MATCHES / CHAT ============================== */
 function MatchesTab({ me }) {
   const [matches, setMatches] = useState(null);
+  const [pitches, setPitches] = useState([]);
   const [activeMatch, setActiveMatch] = useState(null);
   const [confirmingId, setConfirmingId] = useState(null);
   const [rehiring, setRehiring] = useState(false);
@@ -1847,8 +2425,51 @@ function MatchesTab({ me }) {
         return { ...m, other, job };
       }))).filter(Boolean).sort((a, b) => b.createdAt - a.createdAt);
       setMatches(list);
+      const p = await getJSON("kiver:pitches-for:" + me.id, true, []);
+      setPitches(p.slice().sort((a, b) => b.createdAt - a.createdAt));
     })();
   }, [me]);
+
+  async function dismissPitch(p) {
+    const remaining = pitches.filter(x => x.id !== p.id);
+    setPitches(remaining);
+    await sSet("kiver:pitches-for:" + me.id, remaining, true);
+  }
+
+  async function likeBackPitch(p) {
+    const workerId = me.type === "worker" ? me.id : p.fromId;
+    const employerId = me.type === "worker" ? p.fromId : me.id;
+    let jobId = p.jobId;
+    if (!jobId) {
+      const employerJobIds = await getJSON("kiver:employer-jobs:" + employerId, true, []);
+      jobId = employerJobIds[0] || null;
+    }
+    const mId = uid();
+    const match = { id: mId, workerId, employerId, jobId, createdAt: Date.now() };
+    await sSet("kiver:match:" + mId, match, true);
+    await addToList("kiver:match-ids", mId);
+    await addToList("kiver:matches-for:" + workerId, mId);
+    await addToList("kiver:matches-for:" + employerId, mId);
+    if (jobId) await addToList("kiver:job-matches:" + jobId, mId);
+    const openingMsgs = [{ sender: p.fromId, text: p.type === "super" ? `⭐ ${p.text}` : p.text, time: p.createdAt }];
+    await sSet("kiver:chat:" + mId, openingMsgs, true);
+
+    const remaining = pitches.filter(x => x.id !== p.id);
+    setPitches(remaining);
+    await sSet("kiver:pitches-for:" + me.id, remaining, true);
+
+    const targetIdForMySwipe = me.type === "worker" ? jobId : p.fromId;
+    if (targetIdForMySwipe) {
+      const mySwipes = await getJSON("kiver:swipes:" + me.id, true, {});
+      mySwipes[targetIdForMySwipe] = "right";
+      await sSet("kiver:swipes:" + me.id, mySwipes, true);
+    }
+
+    const other = await getJSON("kiver:user:" + p.fromId, true, null);
+    const job = jobId ? await getJSON("kiver:job:" + jobId, true, null) : null;
+    toast("🎉 It's a match!");
+    setActiveMatch({ ...match, other, job });
+  }
 
   async function confirmRehire(m) {
     setRehiring(true);
@@ -1858,6 +2479,7 @@ function MatchesTab({ me }) {
     await sSet("kiver:chat:" + m.id, [...existing, sysMsg], true);
     setRehiring(false);
     setConfirmingId(null);
+    toast("🔁 Rehire sent");
     setActiveMatch(m);
   }
 
@@ -1866,8 +2488,36 @@ function MatchesTab({ me }) {
   return (
     <div style={{ overflowY: "auto", flex: 1 }}>
       <TopBar title="Matches" />
+
+      {pitches.length > 0 && (
+        <div style={{ padding: "14px 16px 4px" }}>
+          <div className="disp" style={{ fontWeight: 700, fontSize: 15, color: C.ink, display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <Sparkles size={16} color="#8B5CF6" /> Pitches ({pitches.length})
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {pitches.map(p => (
+              <div key={p.id} style={{ background: "#F8F5FF", border: "1px solid #E4D9FC", borderRadius: 14, padding: 12 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: `url(${p.fromPhoto}) center/cover`, flexShrink: 0, border: "1.5px solid #fff" }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13.5, color: C.ink }}>{p.fromName}</div>
+                    <div style={{ fontSize: 11, color: "#8B5CF6", fontWeight: 700 }}>{p.type === "super" ? "⭐ Super Pitch" : "✈️ Direct Pitch"}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13.5, color: C.ink, marginTop: 8, lineHeight: 1.4 }}>{p.text}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={() => dismissPitch(p)} style={{ flex: 1, background: "#fff", border: `1px solid ${C.line}`, borderRadius: 10, padding: "8px", fontSize: 12.5, fontWeight: 700, color: C.inkDim }}>Dismiss</button>
+                  <button onClick={() => likeBackPitch(p)} style={{ flex: 1, background: `linear-gradient(135deg, ${C.blue}, ${C.blueDark})`, border: "none", borderRadius: 10, padding: "8px", fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Like Back</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 16 }} />
+        </div>
+      )}
+
       {matches === null && <div style={{ padding: 20, color: C.inkDim }}>Loading...</div>}
-      {matches && matches.length === 0 && (
+      {matches && matches.length === 0 && pitches.length === 0 && (
         <div style={{ padding: 30, color: C.inkDim, textAlign: "center" }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: C.blueSoft, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px" }}>
             <MessageCircle size={24} color={C.blue} />
@@ -1947,6 +2597,11 @@ function ChatScreen({ me, match, onBack }) {
   const [hasRated, setHasRated] = useState(false);
   const bottomRef = useRef();
 
+  const jobLabel = match.job ? (match.job.title === "Custom" ? match.job.customTitle : match.job.title) : "a job";
+  const starters = me.type === "worker"
+    ? [`Hi! I'm interested in the ${jobLabel} role.`, "Are you available this week?", "What's the pay and hours like?"]
+    : ["Hi! When can you start?", "Are you available this week?", "Tell me a bit about your experience."];
+
   useEffect(() => {
     (async () => setMessages(await getJSON("kiver:chat:" + match.id, true, [])))();
   }, [match.id]);
@@ -1961,13 +2616,20 @@ function ChatScreen({ me, match, onBack }) {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  async function send() {
-    if (!text.trim()) return;
-    const msg = { sender: me.id, text: text.trim(), time: Date.now() };
+  async function sendText(t) {
+    if (!t.trim()) return;
+    const msg = { sender: me.id, text: t.trim(), time: Date.now() };
     const updated = [...(messages || []), msg];
     setMessages(updated);
-    setText("");
     await sSet("kiver:chat:" + match.id, updated, true);
+    toast("Message sent");
+  }
+
+  async function send() {
+    if (!text.trim()) return;
+    const t = text;
+    setText("");
+    await sendText(t);
   }
 
   async function submitReview(rating, comment) {
@@ -1980,6 +2642,7 @@ function ChatScreen({ me, match, onBack }) {
     await sSet("kiver:reviews:" + match.other.id, list, true);
     setHasRated(true);
     setShowRate(false);
+    toast("✓ Review submitted");
   }
 
   return (
@@ -1997,8 +2660,18 @@ function ChatScreen({ me, match, onBack }) {
       <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 8, background: C.bg }}>
         {messages === null && <div style={{ color: C.inkDim }}>Loading...</div>}
         {messages && messages.length === 0 && (
-          <div style={{ color: C.inkDim, fontSize: 13, textAlign: "center", marginTop: 20 }}>
-            You matched on {match.job ? (match.job.title === "Custom" ? match.job.customTitle : match.job.title) : "a job"}. Say hello!
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <div style={{ color: C.inkDim, fontSize: 13, marginBottom: 14 }}>
+              You matched on {jobLabel}. Say hello!
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
+              {starters.map((s, i) => (
+                <button key={i} onClick={() => sendText(s)} style={{
+                  background: "#fff", border: `1.5px solid ${C.line}`, borderRadius: 20, padding: "9px 16px",
+                  fontSize: 13, color: C.blue, fontWeight: 600, maxWidth: "88%", boxShadow: "0 2px 8px #13204314"
+                }}>{s}</button>
+              ))}
+            </div>
           </div>
         )}
         {messages && messages.map((m, i) => (
@@ -2053,6 +2726,7 @@ function PostTab({ me, goToProfile }) {
     const updated = { ...job, urgent: nextUrgent, urgentUntil: nextUrgent ? Date.now() + 2 * 60 * 60 * 1000 : null };
     delete updated._filled;
     await sSet("kiver:job:" + job.id, updated, true);
+    toast(nextUrgent ? "🚨 Shift SOS activated" : "Shift SOS cancelled");
     load();
   }
 
@@ -2134,6 +2808,10 @@ function EditProfileForm({ me, onSave, onCancel }) {
   const [country, setCountry] = useState((me.location || "").split(",")[1]?.trim() || "");
   const [bio, setBio] = useState(me.bio || "");
   const [abilities, setAbilities] = useState(me.abilities || []);
+  const [workStyle, setWorkStyle] = useState(me.workStyle || "");
+  const [availability, setAvailability] = useState(me.availability || "");
+  const [prompts, setPrompts] = useState(me.prompts || []);
+  const [businessBio, setBusinessBio] = useState(me.businessBio || "");
   const [sponsorship, setSponsorship] = useState(me.sponsorship || "Does not need sponsorship");
   const [lat, setLat] = useState(me.lat ?? null);
   const [lng, setLng] = useState(me.lng ?? null);
@@ -2145,12 +2823,15 @@ function EditProfileForm({ me, onSave, onCancel }) {
     if (isWorker && photos.length === 0) return setError("At least 1 profile photo is required.");
     if (!name.trim() || !city.trim() || !country.trim()) return setError("Name and location are required.");
     if (isWorker && abilities.length === 0) return setError("Choose at least 1 job you can do.");
+    if (lat == null || lng == null) return setError("Location is required — tap 'Update my current location' below.");
     if (newPassword && newPassword.length < 4) return setError("New password should be at least 4 characters.");
     setError(""); setSaving(true);
 
     const updated = {
       ...me, name: name.trim(), location: `${city.trim()}, ${country.trim()}`, lat, lng,
-      ...(isWorker ? { photo: photos[0] || null, photos, bio, abilities, sponsorship } : { photo }),
+      ...(isWorker
+        ? { photo: photos[0] || null, photos, bio, abilities, sponsorship, workStyle, availability, prompts: prompts.filter(p => p.prompt && p.answer?.trim()) }
+        : { photo, businessBio }),
     };
     await sSet("kiver:user:" + me.id, updated, true);
 
@@ -2160,6 +2841,7 @@ function EditProfileForm({ me, onSave, onCancel }) {
       if (rec) await sSet(key, { ...rec, passwordObf: obfuscate(newPassword) }, true);
     }
     setSaving(false);
+    toast("✓ Profile updated");
     onSave(updated);
   }
 
@@ -2176,11 +2858,28 @@ function EditProfileForm({ me, onSave, onCancel }) {
           <div style={{ flex: 1 }}><Field label="City *"><input style={inputStyle} value={city} onChange={e => setCity(capWords(e.target.value))} /></Field></div>
           <div style={{ flex: 1 }}><Field label="Country *"><input style={inputStyle} value={country} onChange={e => setCountry(capWords(e.target.value))} /></Field></div>
         </div>
-        <LocationCaptureButton lat={lat} lng={lng} onCapture={(la, lo) => { setLat(la); setLng(lo); }} label="Update my current location" />
+        <LocationCaptureButton lat={lat} lng={lng} onCapture={(la, lo) => { setLat(la); setLng(lo); toast("📍 Location saved"); }} label="Update my current location *" required />
         {isWorker && (
           <>
             <Field label="What work can you do? (up to 3) *">
               <ProfessionPicker selected={abilities} onChange={setAbilities} max={3} placeholder="e.g. Gardener, Forklift Operator, IT Technician..." />
+            </Field>
+            <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <Field label="Work style"><select style={inputStyle} value={workStyle} onChange={e => setWorkStyle(e.target.value)}>
+                  <option value="">Not specified</option>
+                  {WORK_STYLE_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                </select></Field>
+              </div>
+              <div style={{ flex: 1 }}>
+                <Field label="Availability"><select style={inputStyle} value={availability} onChange={e => setAvailability(e.target.value)}>
+                  <option value="">Not specified</option>
+                  {AVAILABILITY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                </select></Field>
+              </div>
+            </div>
+            <Field label="Profile prompts (optional)">
+              <PromptsPicker prompts={prompts} onChange={setPrompts} max={2} />
             </Field>
             <Field label="Short bio"><textarea style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} value={bio} onChange={e => setBio(e.target.value)} /></Field>
             <Field label="Sponsorship">
@@ -2190,6 +2889,11 @@ function EditProfileForm({ me, onSave, onCancel }) {
               </select>
             </Field>
           </>
+        )}
+        {!isWorker && (
+          <Field label="About your business (optional)">
+            <textarea style={{ ...inputStyle, minHeight: 70, resize: "vertical" }} value={businessBio} onChange={e => setBusinessBio(e.target.value)} placeholder="What should candidates know about working with you?" />
+          </Field>
         )}
         <Field label="New password (optional)"><input style={inputStyle} type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Leave blank to keep current" /></Field>
         {error && <div style={{ color: "#E14B5A", fontSize: 13, marginBottom: 10 }}>{error}</div>}
